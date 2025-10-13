@@ -118,11 +118,11 @@ require("dotenv").config();
 
     // Create refresh token (longer-lived)
     const refreshToken = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
-
+    
     // Optionally store the refresh token in DB (recommended for security)
     const updateTokenSql = "UPDATE jwt_tokens SET token=? WHERE user_id=?";
     db.query(updateTokenSql, [refreshToken, user.id]);
@@ -135,4 +135,6 @@ require("dotenv").config();
   });
 };
 
-module.exports = { registerUser, loginUser };
+
+
+module.exports = { registerUser, loginUser};

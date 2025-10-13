@@ -1,6 +1,6 @@
 const jwt= require("jsonwebtoken");
 
-export const protect = (req, res, next) => {
+ const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -20,3 +20,15 @@ export const protect = (req, res, next) => {
     return res.status(401).json({ message: "Invalid token" });
   }
 };
+
+const getProfile = (req, res) => {
+  // protect runs before this
+  const user = req.user;
+
+  res.status(200).json({
+    message: "User details fetched successfully",
+    user,
+  });
+};
+
+module.exports = { protect, getProfile };
