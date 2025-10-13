@@ -1,8 +1,8 @@
-import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import db from "./config/db.js";
-import userRoutes from "./routes/userRoutes.js";
+const express=require("express")
+const dotenv=require("dotenv")
+const cors=require("cors")
+const db=require("./config/db")
+const userRoutes =require("./routes/userRoutes")
 
 dotenv.config();
 

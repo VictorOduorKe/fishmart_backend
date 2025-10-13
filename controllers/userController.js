@@ -1,11 +1,9 @@
-import db from "../config/db.js";
-import bcrypt from "bcrypt";
-import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
+const  db =require("../config/db");
+const  bcrypt =require("bcrypt");
+const  jwt =require("jsonwebtoken");
+require("dotenv").config();
 
-dotenv.config();
-
-export const registerUser = async (req, res) => {
+ const registerUser = async (req, res) => {
   const { full_name, email, phone, password, confirm_password } = req.body;
 
   // Validate fields
@@ -96,7 +94,7 @@ export const registerUser = async (req, res) => {
 
 
 
-export const loginUser = async (req, res) => {
+ const loginUser = async (req, res) => {
   const { email, password } = req.body;
   const sql = "SELECT email, password, id FROM users WHERE email = ? LIMIT 1";
 
@@ -136,3 +134,5 @@ export const loginUser = async (req, res) => {
     });
   });
 };
+
+module.exports = { registerUser, loginUser };
