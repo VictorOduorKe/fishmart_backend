@@ -1,32 +1,43 @@
 const db = require("../config/db");
 
 // Fetch Products
-const fetchProducts = (req, res) => {
-  const query = `
-    SELECT product_name, description, price, category, stock, expiry_date, user_id
-    FROM products
-    WHERE expiry_date >= NOW() - INTERVAL 7 DAY AND stock > 0
-    ORDER BY expiry_date DESC
-  `;
-  db.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Error fetching products: " + err.message });
-    }
-    return res.status(200).json({ products: results });
-  });
-};
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios"); // to fetch image from URL
+const db = require("../config/db"); // adjust path if needed
 
-// Add Product (protected)
-const addProduct = (req, res) => {
-  const user_id = req.user.id; // ✅ comes from decoded token (protect middleware)
-  const userRole = req.user.role; // ✅ comes from decoded token (protect middleware)
+const addProduct = async (req, res) => {
+  const user_id = req.user.id;
+  const userRole = req.user.role;
 
+  // Only sellers or admins can add products
   if (userRole !== "seller" && userRole !== "admin") {
     return res.status(403).json({ message: "Only sellers or admins can add products" });
   }
-  const { name, description, price, category, stock, fished_time } = req.body;
 
-  if (!name || !description || !price || !category || !stock || !fished_time) {
+  const {
+    business_id,
+    product_name,
+    description,
+    price,
+    weight,
+    stock,
+    category,
+    expiry_date,
+    image, // This is the image URL from frontend
+  } = req.body;
+
+  // Basic field validation
+  if (
+    !business_id ||
+    !product_name ||
+    !description ||
+    !price ||
+    !stock ||
+    !category ||
+    !expiry_date ||
+    !image
+  ) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -34,44 +45,95 @@ const addProduct = (req, res) => {
     return res.status(400).json({ message: "Price must be a positive number" });
   }
 
-  if (!Number.isInteger(stock) || stock < 0) {
+  if (!Number.isInteger(Number(stock)) || stock < 0) {
     return res.status(400).json({ message: "Stock must be a non-negative integer" });
   }
 
-  const currentDate = new Date();
-  const fishedDate = new Date(fished_time);
+  const expiryDate = new Date(expiry_date);
+  const now = new Date();
 
-  if (isNaN(fishedDate)) {
-    return res.status(400).json({ message: "Invalid fished date format" });
+  if (isNaN(expiryDate.getTime()) || expiryDate <= now) {
+    return res.status(400).json({ message: "Expiry date must be valid and in the future" });
   }
 
-  if (fishedDate > currentDate) {
-    return res.status(400).json({ message: "Fished date cannot be in the future." });
-  }
+  // ✅ Step 1: Download image and store in local folder
+  try {
+    const imageResponse = await axios.get(image, { responseType: "arraybuffer" });
 
-  const expiryDate = new Date(fishedDate);
-  expiryDate.setDate(expiryDate.getDate() + 7);
+    // Extract image file name from URL (or generate one)
+    const fileName = `${Date.now()}-${path.basename(image.split("?")[0])}`;
+    const folderPath = path.join(__dirname, "../public/products");
 
-  if (expiryDate <= currentDate) {
-    return res.status(400).json({ message: "Cannot add product — this fish has already expired." });
-  }
-
-  const query = `
-    INSERT INTO products (product_name, description, price, category, stock, fished_time, expiry_date, user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  db.query(query, [name, description, price, category, stock, fished_time, expiryDate, user_id], (err, result) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ message: "Error adding product" });
+    // Ensure folder exists
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
     }
 
-    res.status(201).json({
-      message: "Product added successfully",
-      expiry_date: expiryDate,
-      productId: result.insertId,
+    // Full path to save the image
+    const filePath = path.join(folderPath, fileName);
+
+    // Write the image to the folder
+    fs.writeFileSync(filePath, imageResponse.data);
+
+    // Relative path to store in DB (to be served by Express static)
+    const imagePath = `/products/${fileName}`;
+
+    // ✅ Step 2: Save product in DB
+    const query = `
+      INSERT INTO products (
+        business_id,
+        user_id,
+        product_name,
+        description,
+        price,
+        weight,
+        stock,
+        category,
+        expiry_date,
+        image
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
+      business_id,
+      user_id,
+      product_name,
+      description,
+      price,
+      weight || 0,
+      stock,
+      category,
+      expiryDate,
+      imagePath,
+    ];
+
+    db.query(query, values, (err, result) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ message: "Error adding product" });
+      }
+
+      res.status(201).json({
+        message: "Product added successfully",
+        product_id: result.insertId,
+        image_path: imagePath,
+        expiry_date: expiryDate,
+      });
     });
+  } catch (error) {
+    console.error("Error downloading image:", error);
+    return res.status(400).json({ message: "Failed to download image from URL" });
+  }
+};
+const fetchProducts = (req, res) => {
+  const sql = "SELECT * FROM products";
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ message: "Error fetching products" });
+    }
+    res.status(200).json({ products: results });
   });
 };
 

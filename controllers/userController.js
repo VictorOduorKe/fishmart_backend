@@ -135,6 +135,99 @@ require("dotenv").config();
   });
 };
 
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+const db = require("../config/db");
 
+const registerBusiness = async (req, res) => {
+  const {
+    email,
+    business_name,
+    business_address,
+    business_phone,
+    business_email,
+    id_number,
+    id_image,           // expected to be a URL
+    business_license    // expected to be a URL (optional)
+  } = req.body;
 
-module.exports = { registerUser, loginUser};
+  if (!email || !business_name || !business_address || !business_phone || !business_email || !id_number || !id_image) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  try {
+    // 1️⃣ Find user by email
+    const [userResults] = await db.promise().query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
+    if (userResults.length === 0) {
+      return res.status(404).json({ message: "User with this email not found. Please register first." });
+    }
+    const user_id = userResults[0].id;
+
+    // 2️⃣ Check if user already has a business
+    const [existing] = await db.promise().query("SELECT id FROM businesses WHERE user_id = ?", [user_id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: "User already registered a business." });
+    }
+
+    // 3️⃣ Prepare upload folder
+    const uploadDir = path.join(__dirname, "../uploads/business");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // 4️⃣ Helper: download image from URL
+    const downloadImage = async (url, filename) => {
+      const response = await axios.get(url, { responseType: "arraybuffer" });
+      const filePath = path.join(uploadDir, filename);
+      fs.writeFileSync(filePath, response.data);
+      return `/uploads/business/${filename}`;
+    };
+
+    // 5️⃣ Save images locally
+    const idImageName = `id_${Date.now()}.jpg`;
+    const idImagePath = await downloadImage(id_image, idImageName);
+
+    let licenseImagePath = null;
+    if (business_license) {
+      const licenseImageName = `license_${Date.now()}.jpg`;
+      licenseImagePath = await downloadImage(business_license, licenseImageName);
+    }
+
+    // 6️⃣ Insert new business
+    const insertSql = `
+      INSERT INTO businesses (
+        user_id,
+        business_name,
+        business_address,
+        business_phone,
+        business_email,
+        id_number,
+        id_image,
+        business_license
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const values = [
+      user_id,
+      business_name,
+      business_address,
+      business_phone,
+      business_email,
+      id_number,
+      idImagePath,
+      licenseImagePath
+    ];
+
+    const [result] = await db.promise().query(insertSql, values);
+
+    res.status(201).json({
+      message: "Business registered successfully",
+      business_id: result.insertId,
+      status: "pending"
+    });
+  } catch (error) {
+    console.error("Error registering business:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+module.exports = { registerUser, loginUser, registerBusiness };
