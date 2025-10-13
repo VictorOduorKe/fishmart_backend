@@ -4,10 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const db = mysql.createConnection({
-  host: process.env.FISHMART_DB_HOST,
-  user: process.env.FISHMART_DB_USER,
-  password: process.env.FISHMART_DB_PASSWORD,
-  database: process.env.FISHMART_DB_NAME,
+  host: process.env.ALWAYSDATA_HOST,
+  user: process.env.ALWAYSDATA_USER,
+  password: process.env.ALWAYSDATA_PASSWORD,
+  database: process.env.ALWAYSDATA_DB,
 });
 
 db.connect((err) => {
