@@ -28,14 +28,14 @@ const registerUser = async (req, res) => {
 
   const phoneRegex = /^\+?[1-9]\d{1,14}$/;
   if (!phoneRegex.test(phone))
-    return res.status(400).json({ message: "Invalid phone number format (e.g., +1234567890)" });
+    return res.status(400).json({ message: "Invalid phone number format (e.g., +2547123456)" });
 
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   if (!passwordRegex.test(password))
     return res.status(400).json({
       message:
-        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character and be at least 8 characters long",
     });
 
   try {
