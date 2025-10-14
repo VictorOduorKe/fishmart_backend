@@ -95,7 +95,7 @@ require("dotenv").config();
 
  const loginUser = async (req, res) => {
   const { email, password } = req.body;
-  const sql = "SELECT id, full_name, email, password, role FROM users WHERE email = ? LIMIT 1";
+  const sql = "SELECT id, full_name, email, password, user_role FROM users WHERE email = ? LIMIT 1";
 
   db.query(sql, [email], async (err, results) => {
     if (err) return res.status(500).json({ error: err });
