@@ -1,10 +1,10 @@
-const fs = require("fs");
-const path = require("path");
-const axios = require("axios");
-const db = require("../config/db"); // this should export pool.promise()
+import fs from  "fs";
+import path from  "path";
+import axios from  "axios";
+import db from  "../config/db.js"; // this should export pool.promise()
 
 // ✅ Add Product
-const addProduct = async (req, res) => {
+export const addProduct = async (req, res) => {
   const user_id = req.user.id;
   const userRole = req.user.role;
 
@@ -98,7 +98,7 @@ const addProduct = async (req, res) => {
 };
 
 // ✅ Fetch Products
-const fetchProducts = async (req, res) => {
+export const fetchProducts = async (req, res) => {
   try {
     const [results] = await db.query("SELECT * FROM products ORDER BY id DESC");
     res.status(200).json({ products: results });
@@ -109,7 +109,7 @@ const fetchProducts = async (req, res) => {
 };
 
 // ✅ Delete Product
-const deleteProduct = async (req, res) => {
+export const deleteProduct = async (req, res) => {
   const { productId } = req.params;
   const userRole = req.user.role;
   const user_id = req.user.id;
@@ -146,7 +146,7 @@ const deleteProduct = async (req, res) => {
 };
 
 // ✅ Update Product
-const updateProduct = async (req, res) => {
+export const updateProduct = async (req, res) => {
   const { productId } = req.params;
   const userRole = req.user.role;
   const user_id = req.user.id;
@@ -183,4 +183,3 @@ const updateProduct = async (req, res) => {
   }
 };
 
-module.exports = { fetchProducts, addProduct, deleteProduct, updateProduct };

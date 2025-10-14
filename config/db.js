@@ -1,6 +1,8 @@
 // config/db.js
-require("dotenv").config();
-const mysql = require("mysql2");
+import dotenv from "dotenv";
+  import mysql from "mysql2";
+
+dotenv.config();
 
 // ✅ Create a regular pool
 const pool = mysql.createPool({
@@ -28,4 +30,4 @@ const promisePool = pool.promise();
   }
 })();
 
-module.exports = promisePool;
+export default promisePool;

@@ -1,16 +1,17 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const fs = require("fs");
-const path = require("path");
-const axios = require("axios");
-const multer = require("multer");
-require("dotenv").config();
-const db = require("../config/db"); // This is your pool.promise()
+import  bcrypt from "bcrypt";
+import  jwt from  "jsonwebtoken";
+import  fs from  "fs";
+import  path from "path";
+import  axios from  "axios";
+import  multer from  "multer";
+import  dotenv from  "dotenv";
+dotenv.config();
+import  db from  "../config/db.js"; // This is your pool.promise()
 
 /** =========================
  *  REGISTER USER
  * ========================= */
-const registerUser = async (req, res) => {
+export const registerUser = async (req, res) => {
   const { full_name, email, phone, password, confirm_password } = req.body;
 
   // ✅ Validate inputs
@@ -75,7 +76,7 @@ const registerUser = async (req, res) => {
 /** =========================
  *  LOGIN USER
  * ========================= */
-const loginUser = async (req, res) => {
+export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -129,7 +130,7 @@ const loginUser = async (req, res) => {
  *  REGISTER BUSINESS
  * ========================= */
 // === Setup multer for file uploads ===
-const storage = multer.diskStorage({
+export const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(process.cwd(), "uploads", "business");
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -231,7 +232,7 @@ export const registerBusiness = async (req, res) => {
 /** =========================
  *  LOGOUT USER
  * ========================= */
-const logOutUser = async (req, res) => {
+export const logOutUser = async (req, res) => {
   const userId = req.user?.id;
   if (!userId)
     return res.status(401).json({ message: "Unauthorized: No user found" });
@@ -249,4 +250,3 @@ const logOutUser = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, registerBusiness, logOutUser };

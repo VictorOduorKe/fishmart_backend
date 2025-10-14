@@ -1,6 +1,6 @@
-const jwt= require("jsonwebtoken");
+import  jwt from "jsonwebtoken";
 
- const protect = (req, res, next) => {
+ export const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -21,7 +21,7 @@ const jwt= require("jsonwebtoken");
   }
 };
 
-const getProfile = (req, res) => {
+export const getProfile = (req, res) => {
   // protect runs before this
   const user = req.user;
 
@@ -30,5 +30,3 @@ const getProfile = (req, res) => {
     user,
   });
 };
-
-module.exports = { protect, getProfile };

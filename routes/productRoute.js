@@ -1,11 +1,11 @@
-const express = require("express");
-const { 
+import express from "express";
+import { 
     addProduct,
     fetchProducts,
     deleteProduct,
     updateProduct
-} = require("../controllers/productControllers");
-const { protect } = require("../midleware/authMidleware");
+} from "../controllers/productControllers.js";
+import { protect } from "../midleware/authMidleware.js";
 
 const router = express.Router();
 
@@ -14,4 +14,4 @@ router.get("/fetch-products", fetchProducts);
 router.delete("/:product_id", protect, deleteProduct);
 router.put("/:product_id", protect, updateProduct);
 
-module.exports = router;
+export default router;

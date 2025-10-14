@@ -1,11 +1,11 @@
 // controllers/orderController.js
-const db = require("../config/db"); // ✅ Using pooled connection (promise-based)
+import db from "../config/db.js"; // ✅ Using pooled connection (promise-based)
 
 const TAX_RATE = 0.07;
 const DELIVERY_FEE = 255.0;
 
 // ==================== PLACE ORDER ====================
-const placeOrder = async (req, res) => {
+export const placeOrder = async (req, res) => {
   try {
     const user_id = req.user?.id;
     const { cart_items } = req.body;
@@ -107,7 +107,7 @@ const placeOrder = async (req, res) => {
 };
 
 // ==================== CONFIRM ORDER ====================
-const confirmOrder = async (req, res) => {
+export const confirmOrder = async (req, res) => {
   try {
     const user_id = req.user?.id;
     const role = req.user?.role;
@@ -158,7 +158,7 @@ const confirmOrder = async (req, res) => {
 };
 
 // ==================== GET ORDERS ====================
-const getOrders = async (req, res) => {
+export const getOrders = async (req, res) => {
   try {
     const user_id = req.user?.id;
     const role = req.user?.role;
@@ -184,8 +184,4 @@ const getOrders = async (req, res) => {
   }
 };
 
-module.exports = {
-  placeOrder,
-  confirmOrder,
-  getOrders,
-};
+

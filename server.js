@@ -1,11 +1,12 @@
-const express=require("express")
-const dotenv=require("dotenv")
-const cors=require("cors")
-const db=require("./config/db")
-const userRoutes =require("./routes/userRoutes")
-const productRoutes =require("./routes/productRoute")
-const orderRoutes =require("./routes/orderRoutes")
-dotenv.config();
+import express from "express"
+import dotenv from "dotenv"
+import cors from "cors"
+import db from "./config/db.js"
+import userRoutes  from "./routes/userRoutes.js"
+import productRoutes  from "./routes/productRoute.js"
+import orderRoutes  from "./routes/orderRoutes.js"
+
+dotenv.config()
 
 const app = express();
 
