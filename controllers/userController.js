@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
+const multer = require("multer");
 require("dotenv").config();
 const db = require("../config/db"); // This is your pool.promise()
 
@@ -127,66 +128,91 @@ const loginUser = async (req, res) => {
 /** =========================
  *  REGISTER BUSINESS
  * ========================= */
-const registerBusiness = async (req, res) => {
-  const {
-    email,
-    business_name,
-    business_address,
-    business_phone,
-    business_email,
-    id_number,
-    id_image,
-    business_license,
-  } = req.body;
-
-  if (!email || !business_name || !business_address || !business_phone || !business_email || !id_number || !id_image)
-    return res.status(400).json({ message: "All fields are required" });
-
-  try {
-    const [userResults] = await db.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
-    if (userResults.length === 0)
-      return res.status(404).json({ message: "User not found. Please register first." });
-
-    const user_id = userResults[0].id;
-    const [existing] = await db.query("SELECT id FROM businesses WHERE user_id = ?", [user_id]);
-    if (existing.length > 0)
-      return res.status(400).json({ message: "User already registered a business." });
-
-    const uploadDir = path.join(__dirname, "../uploads/business");
+// === Setup multer for file uploads ===
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), "uploads", "business");
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  },
+});
 
-    const downloadImage = async (url, filename) => {
-      const response = await axios.get(url, { responseType: "arraybuffer" });
-      const filePath = path.join(uploadDir, filename);
-      fs.writeFileSync(filePath, response.data);
-      return `/uploads/business/${filename}`;
-    };
+const upload = multer({ storage });
 
-    const idImageName = `id_${Date.now()}.jpg`;
-    const idImagePath = await downloadImage(id_image, idImageName);
+// === Register business function ===
+export const registerBusiness = async (req, res) => {
+  try {
+    const {
+      business_name,
+      business_license,
+      business_address,
+      business_phone,
+      business_email,
+      id_number,
+    } = req.body;
 
-    let licenseImagePath = null;
-    if (business_license) {
-      const licenseImageName = `license_${Date.now()}.jpg`;
-      licenseImagePath = await downloadImage(business_license, licenseImageName);
+    // Step 1: Get user_id using business_email
+    const [userRows] = await db.query(
+      "SELECT id FROM users WHERE email = ?",
+      [business_email]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found for the provided email." });
     }
 
+    const user_id = userRows[0].id;
+
+    // Step 2: Validate required fields
+    if (
+      !business_name ||
+      !business_license ||
+      !business_address ||
+      !business_phone ||
+      !business_email ||
+      !id_number ||
+      !req.files?.id_image ||
+      !req.files?.address_proof
+    ) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Step 3: Check if the business already exists for this user
+    const [existingBusiness] = await db.query(
+      "SELECT id FROM businesses WHERE user_id = ? LIMIT 1",
+      [user_id]
+    );
+
+    if (existingBusiness.length > 0) {
+      return res.status(400).json({ message: "Business already registered for this user." });
+    }
+
+    // Step 4: Extract uploaded file paths
+    const id_image = `/uploads/business/${req.files.id_image[0].filename}`;
+    const address_proof = `/uploads/business/${req.files.address_proof[0].filename}`;
+
+    // Step 5: Insert business record
     const insertSql = `
       INSERT INTO businesses (
-        user_id, business_name, business_address, business_phone,
-        business_email, id_number, id_image, business_license
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        user_id, business_name, business_license, business_address,
+        business_phone, business_email, id_number, id_image, address_proof
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(insertSql, [
       user_id,
       business_name,
+      business_license,
       business_address,
       business_phone,
       business_email,
       id_number,
-      idImagePath,
-      licenseImagePath,
+      id_image,
+      address_proof,
     ]);
 
     return res.status(201).json({
@@ -194,11 +220,13 @@ const registerBusiness = async (req, res) => {
       business_id: result.insertId,
       status: "pending",
     });
+
   } catch (error) {
     console.error("❌ registerBusiness error:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 /** =========================
  *  LOGOUT USER
