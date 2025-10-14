@@ -110,7 +110,7 @@ require("dotenv").config();
 
     // Create access token (short-lived)
     const accessToken = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
