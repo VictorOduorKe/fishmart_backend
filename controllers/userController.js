@@ -1,132 +1,113 @@
-const  bcrypt =require("bcrypt");
-const  jwt =require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
 require("dotenv").config();
+const db = require("../config/db"); // This is your pool.promise()
 
- const registerUser = async (req, res) => {
+/** =========================
+ *  REGISTER USER
+ * ========================= */
+const registerUser = async (req, res) => {
   const { full_name, email, phone, password, confirm_password } = req.body;
 
-  // Validate fields
-  if (!full_name || !email || !phone || !password || !confirm_password) {
+  // ✅ Validate inputs
+  if (!full_name || !email || !phone || !password || !confirm_password)
     return res.status(400).json({ message: "All fields are required" });
-  }
 
-  if (password.length < 8) {
-    return res
-      .status(400)
-      .json({ message: "Password must be at least 8 characters long" });
-  }
+  if (password.length < 8)
+    return res.status(400).json({ message: "Password must be at least 8 characters long" });
 
-  if (password !== confirm_password) {
+  if (password !== confirm_password)
     return res.status(400).json({ message: "Passwords do not match" });
-  }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
+  if (!emailRegex.test(email))
     return res.status(400).json({ message: "Invalid email format" });
-  }
 
   const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-  if (!phoneRegex.test(phone)) {
-    return res
-      .status(400)
-      .json({ message: "Invalid phone number format (e.g., +1234567890)" });
-  }
+  if (!phoneRegex.test(phone))
+    return res.status(400).json({ message: "Invalid phone number format (e.g., +1234567890)" });
 
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  if (!passwordRegex.test(password)) {
+  if (!passwordRegex.test(password))
     return res.status(400).json({
       message:
         "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
     });
-  }
 
   try {
-    // Check if user with same email or phone already exists
-    const checkUserQuery = "SELECT email, phone FROM users WHERE email = ? OR phone = ? LIMIT 1";
-    db.query(checkUserQuery, [email, phone], async (err, results) => {
-      if (err) {
-        console.error("Error checking user existence:", err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
+    // 🔍 Check if user exists
+    const [existingUser] = await db.query(
+      "SELECT email, phone FROM users WHERE email = ? OR phone = ? LIMIT 1",
+      [email, phone]
+    );
 
-      if (results.length > 0) {
-        const existingUser = results[0];
-        if (existingUser.email === email) {
-          return res.status(400).json({ message: "User with this email already exists" });
-        }
-        if (existingUser.phone === phone) {
-          return res.status(400).json({ message: "User with this phone number already exists" });
-        }
-      }
+    if (existingUser.length > 0) {
+      if (existingUser[0].email === email)
+        return res.status(400).json({ message: "User with this email already exists" });
+      if (existingUser[0].phone === phone)
+        return res.status(400).json({ message: "User with this phone number already exists" });
+    }
 
-      // Hash password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
+    // 🔐 Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Insert user
-      const insertUserQuery =
-        "INSERT INTO users (full_name, email, phone, password) VALUES (?, ?, ?, ?)";
-      db.query(insertUserQuery, [full_name, email, phone, hashedPassword], (err, result) => {
-        if (err) {
-          console.error("Error inserting user:", err);
-          return res.status(500).json({ message: "Internal server error" });
-        }
+    // 🧑‍💻 Insert user
+    const [result] = await db.query(
+      "INSERT INTO users (full_name, email, phone, password) VALUES (?, ?, ?, ?)",
+      [full_name, email, phone, hashedPassword]
+    );
 
-        // Initialize JWT record
-        const insertTokenSql = "INSERT INTO jwt_tokens (user_id, token) VALUES (?, ?)";
-        db.query(insertTokenSql, [result.insertId, ""], (err) => {
-          if (err) {
-            console.error("Error initializing JWT token record:", err);
-          }
-        });
+    // 💾 Initialize JWT record
+    await db.query("INSERT INTO jwt_tokens (user_id, token) VALUES (?, ?)", [result.insertId, ""]);
 
-        return res.status(201).json({ message: "User registered successfully" });
-      });
-    });
+    return res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    console.error("Unexpected error:", error);
-    return res.status(500).json({ message: "Server error" });
+    console.error("❌ registerUser error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-
-
-
- const loginUser = async (req, res) => {
+/** =========================
+ *  LOGIN USER
+ * ========================= */
+const loginUser = async (req, res) => {
   const { email, password } = req.body;
-  const sql = "SELECT id, full_name, email, password, user_role FROM users WHERE email = ? LIMIT 1";
 
-  db.query(sql, [email], async (err, results) => {
-    if (err) return res.status(500).json({ error: err });
-    if (results.length === 0)
+  try {
+    const [rows] = await db.query(
+      "SELECT id, full_name, email, password, user_role FROM users WHERE email = ? LIMIT 1",
+      [email]
+    );
+
+    if (rows.length === 0)
       return res.status(404).json({ message: "User not found" });
 
-    const user = results[0];
+    const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch)
       return res.status(401).json({ message: "Invalid credentials" });
 
-    // Create access token (short-lived)
+    // 🪙 Create tokens
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, full_name: user.full_name, role: user.user_role },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
 
-    // Create refresh token (longer-lived)
     const refreshToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.user_ole },
+      { id: user.id, email: user.email, role: user.user_role },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
 
-    // Optionally store the refresh token in DB
-    const updateTokenSql = "UPDATE jwt_tokens SET token=? WHERE user_id=?";
-    db.query(updateTokenSql, [refreshToken, user.id]);
+    // 💾 Store refresh token
+    await db.query("UPDATE jwt_tokens SET token = ? WHERE user_id = ?", [refreshToken, user.id]);
 
-    res.json({
+    return res.json({
       message: "Login successful",
       user: {
         id: user.id,
@@ -137,15 +118,15 @@ require("dotenv").config();
       accessToken,
       refreshToken,
     });
-  });
+  } catch (error) {
+    console.error("❌ loginUser error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 };
 
-
-const fs = require("fs");
-const path = require("path");
-const axios = require("axios");
-const db = require("../config/db");
-
+/** =========================
+ *  REGISTER BUSINESS
+ * ========================= */
 const registerBusiness = async (req, res) => {
   const {
     email,
@@ -154,35 +135,26 @@ const registerBusiness = async (req, res) => {
     business_phone,
     business_email,
     id_number,
-    id_image,           // expected to be a URL
-    business_license    // expected to be a URL (optional)
+    id_image,
+    business_license,
   } = req.body;
 
-  if (!email || !business_name || !business_address || !business_phone || !business_email || !id_number || !id_image) {
+  if (!email || !business_name || !business_address || !business_phone || !business_email || !id_number || !id_image)
     return res.status(400).json({ message: "All fields are required" });
-  }
 
   try {
-    // 1️⃣ Find user by email
-    const [userResults] = await db.promise().query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
-    if (userResults.length === 0) {
-      return res.status(404).json({ message: "User with this email not found. Please register first." });
-    }
+    const [userResults] = await db.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
+    if (userResults.length === 0)
+      return res.status(404).json({ message: "User not found. Please register first." });
+
     const user_id = userResults[0].id;
-
-    // 2️⃣ Check if user already has a business
-    const [existing] = await db.promise().query("SELECT id FROM businesses WHERE user_id = ?", [user_id]);
-    if (existing.length > 0) {
+    const [existing] = await db.query("SELECT id FROM businesses WHERE user_id = ?", [user_id]);
+    if (existing.length > 0)
       return res.status(400).json({ message: "User already registered a business." });
-    }
 
-    // 3️⃣ Prepare upload folder
     const uploadDir = path.join(__dirname, "../uploads/business");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-    // 4️⃣ Helper: download image from URL
     const downloadImage = async (url, filename) => {
       const response = await axios.get(url, { responseType: "arraybuffer" });
       const filePath = path.join(uploadDir, filename);
@@ -190,7 +162,6 @@ const registerBusiness = async (req, res) => {
       return `/uploads/business/${filename}`;
     };
 
-    // 5️⃣ Save images locally
     const idImageName = `id_${Date.now()}.jpg`;
     const idImagePath = await downloadImage(id_image, idImageName);
 
@@ -200,20 +171,14 @@ const registerBusiness = async (req, res) => {
       licenseImagePath = await downloadImage(business_license, licenseImageName);
     }
 
-    // 6️⃣ Insert new business
     const insertSql = `
       INSERT INTO businesses (
-        user_id,
-        business_name,
-        business_address,
-        business_phone,
-        business_email,
-        id_number,
-        id_image,
-        business_license
+        user_id, business_name, business_address, business_phone,
+        business_email, id_number, id_image, business_license
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const values = [
+
+    const [result] = await db.query(insertSql, [
       user_id,
       business_name,
       business_address,
@@ -221,44 +186,39 @@ const registerBusiness = async (req, res) => {
       business_email,
       id_number,
       idImagePath,
-      licenseImagePath
-    ];
+      licenseImagePath,
+    ]);
 
-    const [result] = await db.promise().query(insertSql, values);
-
-    res.status(201).json({
+    return res.status(201).json({
       message: "Business registered successfully",
       business_id: result.insertId,
-      status: "pending"
+      status: "pending",
     });
   } catch (error) {
-    console.error("Error registering business:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ registerBusiness error:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
-const logOutUser = (req, res) => {
+
+/** =========================
+ *  LOGOUT USER
+ * ========================= */
+const logOutUser = async (req, res) => {
   const userId = req.user?.id;
-
-  if (!userId) {
+  if (!userId)
     return res.status(401).json({ message: "Unauthorized: No user found" });
-  }
 
-  const deleteTokenSql = "UPDATE jwt_tokens SET token = NULL WHERE user_id = ?";
-
-  db.query(deleteTokenSql, [userId], (err, result) => {
-    if (err) {
-      console.error("❌ Error logging out user:", err);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-
-    if (result.affectedRows === 0) {
+  try {
+    const [result] = await db.query("UPDATE jwt_tokens SET token = NULL WHERE user_id = ?", [userId]);
+    if (result.affectedRows === 0)
       return res.status(404).json({ message: "No token found for this user" });
-    }
 
     console.log(`✅ User ${userId} logged out successfully`);
-    res.status(200).json({ message: "User logged out successfully" });
-  });
+    return res.status(200).json({ message: "User logged out successfully" });
+  } catch (error) {
+    console.error("❌ logOutUser error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 };
-
 
 module.exports = { registerUser, loginUser, registerBusiness, logOutUser };

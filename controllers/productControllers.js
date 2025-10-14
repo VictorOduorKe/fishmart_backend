@@ -1,15 +1,13 @@
-
-// Fetch Products
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios"); // to fetch image from URL
-const db = require("../config/db"); // adjust path if needed
+const axios = require("axios");
+const db = require("../config/db"); // this should export pool.promise()
 
+// ✅ Add Product
 const addProduct = async (req, res) => {
   const user_id = req.user.id;
   const userRole = req.user.role;
 
-  // Only sellers or admins can add products
   if (userRole !== "seller" && userRole !== "admin") {
     return res.status(403).json({ message: "Only sellers or admins can add products" });
   }
@@ -23,10 +21,10 @@ const addProduct = async (req, res) => {
     stock,
     category,
     expiry_date,
-    image, // This is the image URL from frontend
+    image,
   } = req.body;
 
-  // Basic field validation
+  // Basic validation
   if (
     !business_id ||
     !product_name ||
@@ -49,47 +47,27 @@ const addProduct = async (req, res) => {
   }
 
   const expiryDate = new Date(expiry_date);
-  const now = new Date();
-
-  if (isNaN(expiryDate.getTime()) || expiryDate <= now) {
+  if (isNaN(expiryDate.getTime()) || expiryDate <= new Date()) {
     return res.status(400).json({ message: "Expiry date must be valid and in the future" });
   }
 
-  // ✅ Step 1: Download image and store in local folder
   try {
+    // 🧠 Step 1: Download product image
     const imageResponse = await axios.get(image, { responseType: "arraybuffer" });
 
-    // Extract image file name from URL (or generate one)
     const fileName = `${Date.now()}-${path.basename(image.split("?")[0])}`;
     const folderPath = path.join(__dirname, "../public/products");
 
-    // Ensure folder exists
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
+    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
 
-    // Full path to save the image
     const filePath = path.join(folderPath, fileName);
-
-    // Write the image to the folder
     fs.writeFileSync(filePath, imageResponse.data);
-
-    // Relative path to store in DB (to be served by Express static)
     const imagePath = `/products/${fileName}`;
 
-    // ✅ Step 2: Save product in DB
+    // 🧠 Step 2: Insert product into DB
     const query = `
       INSERT INTO products (
-        business_id,
-        user_id,
-        product_name,
-        description,
-        price,
-        weight,
-        stock,
-        category,
-        expiry_date,
-        image
+        business_id, user_id, product_name, description, price, weight, stock, category, expiry_date, image
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -106,146 +84,103 @@ const addProduct = async (req, res) => {
       imagePath,
     ];
 
-    db.query(query, values, (err, result) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).json({ message: "Error adding product" });
-      }
+    const [result] = await db.query(query, values);
 
-      res.status(201).json({
-        message: "Product added successfully",
-        product_id: result.insertId,
-        image_path: imagePath,
-        expiry_date: expiryDate,
-      });
+    res.status(201).json({
+      message: "Product added successfully",
+      product_id: result.insertId,
+      image_path: imagePath,
     });
   } catch (error) {
-    console.error("Error downloading image:", error);
-    return res.status(400).json({ message: "Failed to download image from URL" });
+    console.error("Error adding product:", error);
+    return res.status(500).json({ message: "Error adding product" });
   }
 };
-const fetchProducts = (req, res) => {
-  const sql = "SELECT * FROM products";
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ message: "Error fetching products" });
-    }
+// ✅ Fetch Products
+const fetchProducts = async (req, res) => {
+  try {
+    const [results] = await db.query("SELECT * FROM products ORDER BY id DESC");
     res.status(200).json({ products: results });
-  });
+  } catch (error) {
+    console.error("Database error:", error);
+    res.status(500).json({ message: "Error fetching products" });
+  }
 };
 
-//Delete Product — Only product owner (seller) or admin can delete
-const deleteProduct = (req, res) => {
+// ✅ Delete Product
+const deleteProduct = async (req, res) => {
   const { productId } = req.params;
   const userRole = req.user.role;
   const user_id = req.user.id;
 
-  if (!user_id) {
-    return res.status(401).json({ message: "Unauthorized: User ID missing" });
-  }
+  if (!user_id) return res.status(401).json({ message: "Unauthorized: User ID missing" });
+  if (!productId) return res.status(400).json({ message: "Product ID is required" });
 
-  if (!productId) {
-    return res.status(400).json({ message: "Product ID is required" });
-  }
+  try {
+    const [results] = await db.query("SELECT user_id FROM products WHERE id = ?", [productId]);
 
-  // Step 1️⃣: Check if product exists and who owns it
-  const checkQuery = "SELECT user_id FROM products WHERE id = ?";
-
-  db.query(checkQuery, [productId], (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ message: "Error checking product ownership" });
-    }
-
-    if (results.length === 0) {
-      return res.status(404).json({ message: "Product not found" });
-    }
+    if (results.length === 0) return res.status(404).json({ message: "Product not found" });
 
     const productOwnerId = results[0].user_id;
 
-    // Step 2️⃣: Check user permissions
     if (userRole !== "admin" && productOwnerId !== user_id) {
-      return res.status(403).json({
-        message: "You are not authorized to delete this product",
-      });
+      return res.status(403).json({ message: "You are not authorized to delete this product" });
     }
 
-    // Step 3️⃣: Proceed to delete (admin can delete any, seller only own)
-    const deleteQuery = "DELETE FROM products WHERE id = ?";
+    const [delResult] = await db.query("DELETE FROM products WHERE id = ?", [productId]);
 
-    db.query(deleteQuery, [productId], (err, result) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).json({ message: "Error deleting product" });
-      }
+    if (delResult.affectedRows === 0)
+      return res.status(404).json({ message: "Product not found or already deleted" });
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Product not found or already deleted" });
-      }
-
-      res.status(200).json({
-        message:
-          userRole === "admin"
-            ? "Product deleted successfully by admin"
-            : "Your product was deleted successfully",
-      });
+    res.status(200).json({
+      message:
+        userRole === "admin"
+          ? "Product deleted successfully by admin"
+          : "Your product was deleted successfully",
     });
-  });
+  } catch (error) {
+    console.error("Database error:", error);
+    res.status(500).json({ message: "Error deleting product" });
+  }
 };
 
-const updateProduct = (req, res) => {
-  const productId = req.params.productId;
+// ✅ Update Product
+const updateProduct = async (req, res) => {
+  const { productId } = req.params;
   const userRole = req.user.role;
   const user_id = req.user.id;
 
-  if (!user_id || !productId) {
+  if (!user_id || !productId)
     return res.status(401).json({ message: "Unauthorized: User ID or Product ID missing" });
-  }
 
-  const checkQuery = "SELECT user_id FROM products WHERE id = ?";
+  try {
+    const [results] = await db.query("SELECT user_id FROM products WHERE id = ?", [productId]);
 
-  db.query(checkQuery, [productId], (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ message: "Error checking product ownership" });
-    }
-
-    if (results.length === 0) {
+    if (results.length === 0)
       return res.status(404).json({ message: "Product not found" });
-    }
 
     const productOwnerId = results[0].user_id;
 
-    // Step 2️⃣: Check user permissions
     if (userRole !== "admin" && productOwnerId !== user_id) {
-      return res.status(403).json({
-        message: "You are not authorized to update this product",
-      });
+      return res.status(403).json({ message: "You are not authorized to update this product" });
     }
 
-    // Step 3️⃣: Proceed to update (admin can update any, seller only own)
-    const updateQuery = "UPDATE products SET ? WHERE id = ?";
+    const [updateResult] = await db.query("UPDATE products SET ? WHERE id = ?", [req.body, productId]);
 
-    db.query(updateQuery, [req.body, productId], (err, result) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).json({ message: "Error updating product" });
-      }
+    if (updateResult.affectedRows === 0)
+      return res.status(404).json({ message: "Product not found or already updated" });
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Product not found or already updated" });
-      }
-
-      res.status(200).json({
-        message:
-          userRole === "admin"
-            ? "Product updated successfully by admin"
-            : "Your product was updated successfully",
-      });
+    res.status(200).json({
+      message:
+        userRole === "admin"
+          ? "Product updated successfully by admin"
+          : "Your product was updated successfully",
     });
-  });
+  } catch (error) {
+    console.error("Database error:", error);
+    res.status(500).json({ message: "Error updating product" });
+  }
 };
 
 module.exports = { fetchProducts, addProduct, deleteProduct, updateProduct };
