@@ -110,14 +110,14 @@ require("dotenv").config();
 
     // Create access token (short-lived)
     const accessToken = jwt.sign(
-      { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
+      { id: user.id, email: user.email, full_name: user.full_name, role: user.user_role },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
 
     // Create refresh token (longer-lived)
     const refreshToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.user_ole },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
@@ -132,7 +132,7 @@ require("dotenv").config();
         id: user.id,
         full_name: user.full_name,
         email: user.email,
-        role: user.role,
+        role: user.user_role,
       },
       accessToken,
       refreshToken,
