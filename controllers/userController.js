@@ -95,7 +95,7 @@ require("dotenv").config();
 
  const loginUser = async (req, res) => {
   const { email, password } = req.body;
-  const sql = "SELECT email, password, id FROM users WHERE email = ? LIMIT 1";
+  const sql = "SELECT id, full_name, email, password, role FROM users WHERE email = ? LIMIT 1";
 
   db.query(sql, [email], async (err, results) => {
     if (err) return res.status(500).json({ error: err });
@@ -121,18 +121,25 @@ require("dotenv").config();
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
-    
-    // Optionally store the refresh token in DB (recommended for security)
+
+    // Optionally store the refresh token in DB
     const updateTokenSql = "UPDATE jwt_tokens SET token=? WHERE user_id=?";
     db.query(updateTokenSql, [refreshToken, user.id]);
 
     res.json({
       message: "Login successful",
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+      },
       accessToken,
       refreshToken,
     });
   });
 };
+
 
 const fs = require("fs");
 const path = require("path");
