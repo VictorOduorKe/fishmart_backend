@@ -5,7 +5,8 @@ import db from "./config/db.js"
 import userRoutes  from "./routes/userRoutes.js"
 import productRoutes  from "./routes/productRoute.js"
 import orderRoutes  from "./routes/orderRoutes.js"
-
+import fs from "fs";
+import path from "path";
 dotenv.config()
 
 const app = express();
@@ -21,6 +22,11 @@ app.get("/", (req, res) => {
   res.send("Backend API is running...");
 });
 
+const uploadDir = path.join(process.cwd(), "uploads/business");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("✅ Created upload directory:", uploadDir);
+}
 // Routes
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
