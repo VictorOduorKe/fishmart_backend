@@ -11,7 +11,7 @@ export async function uploadToHostPinnacle(localFilePath, remoteFileName) {
       password: process.env.FTP_PASS,
     });
 
-    const remotePath = `/home/fishmart/public_html/uploads/business/${remoteFileName}`;
+    const remotePath = `/home1/fishmart/public_html/uploads/business/${remoteFileName}`;
     await sftp.fastPut(localFilePath, remotePath);
 
     console.log(`✅ Uploaded via SFTP: ${remoteFileName}`);
