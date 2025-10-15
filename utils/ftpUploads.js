@@ -18,7 +18,7 @@ export async function uploadToHostPinnacle(localFilePath, remoteFileName) {
     await client.uploadFrom(localFilePath, remotePath);
 
     console.log(`✅ Uploaded ${localFilePath} to ${remotePath}`);
-    return `https://yourdomain.com/uploads/business/${remoteFileName}`;
+    return `https://fishmartapp.com/uploads/business/${remoteFileName}`;
   } catch (err) {
     console.error("❌ FTP Upload Error:", err);
     throw err;
