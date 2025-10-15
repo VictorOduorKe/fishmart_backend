@@ -5,7 +5,8 @@ import {
   registerUser, 
   loginUser, 
   registerBusiness, 
-  logOutUser 
+  logOutUser, 
+  fetchBusinessDetails
 } from "../controllers/userController.js";
 import { protect, getProfile } from "../midleware/authMidleware.js";
 
@@ -28,7 +29,7 @@ const upload = multer({ storage });
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.get("/profile", protect, getProfile);
-
+router.get("/businesses", fetchBusinessDetails);
 // 👇 Add upload middleware here
 router.post(
   "/register-business",

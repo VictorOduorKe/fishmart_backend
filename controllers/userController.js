@@ -228,6 +228,63 @@ export const registerBusiness = async (req, res) => {
   }
 };
 
+export const fetchBusinessDetails = async (req, res) => {
+  try {
+    // Fetch all business records
+    const [results] = await db.query(`
+      SELECT 
+        b.id,
+        b.business_name,
+        b.business_license,
+        b.business_address,
+        b.business_phone,
+        b.business_email,
+        b.id_number,
+        b.id_image,
+        b.address_proof,
+        b.status,
+        u.full_name AS owner_name,
+        u.email AS owner_email
+      FROM businesses AS b
+      JOIN users AS u ON b.user_id = u.id
+      ORDER BY b.id DESC
+    `);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "No businesses found." });
+    }
+
+    // Build full URLs for uploaded files
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const businesses = results.map((business) => ({
+      id: business.id,
+      business_name: business.business_name,
+      business_license: business.business_license,
+      business_address: business.business_address,
+      business_phone: business.business_phone,
+      business_email: business.business_email,
+      id_number: business.id_number,
+      status: business.status,
+      owner_name: business.owner_name,
+      owner_email: business.owner_email,
+      id_image: business.id_image
+        ? `${baseUrl}${business.id_image}`
+        : null,
+      address_proof: business.address_proof
+        ? `${baseUrl}${business.address_proof}`
+        : null,
+    }));
+
+    return res.status(200).json(businesses);
+  } catch (error) {
+    console.error("❌ fetchBusinessDetails error:", error);
+    res.status(500).json({
+      message: "An error occurred while fetching business details",
+      error: error.message,
+    });
+  }
+};
 
 /** =========================
  *  LOGOUT USER
