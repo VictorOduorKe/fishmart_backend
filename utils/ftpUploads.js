@@ -1,28 +1,25 @@
-import ftp from "basic-ftp";
+import Client from "ssh2-sftp-client";
 import fs from "fs";
-import path from "path";
 
 export async function uploadToHostPinnacle(localFilePath, remoteFileName) {
-  const client = new ftp.Client();
-  client.ftp.verbose = true; // optional, logs FTP actions
-
+  const sftp = new Client();
   try {
-    await client.access({
-      host: process.env.FTP_HOST,     // replace with your HostPinnacle FTP host
-      user: process.env.FTP_USER,      // replace with your FTP username
-      password: process.env.FTP_PASS,  // replace with your FTP password
-      secure: true                     // explicit FTPS
+    await sftp.connect({
+      host: process.env.FTP_HOST,
+      port: 22,
+      username: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
     });
 
-    const remotePath = `/uploads/business/${remoteFileName}`;
-    await client.uploadFrom(localFilePath, remotePath);
+    const remotePath = `/home/yourcpanelusername/public_html/uploads/business/${remoteFileName}`;
+    await sftp.fastPut(localFilePath, remotePath);
 
-    console.log(`✅ Uploaded ${localFilePath} to ${remotePath}`);
+    console.log(`✅ Uploaded via SFTP: ${remoteFileName}`);
     return `https://fishmartapp.com/uploads/business/${remoteFileName}`;
   } catch (err) {
-    console.error("❌ FTP Upload Error:", err);
+    console.error("❌ SFTP Upload Error:", err);
     throw err;
   } finally {
-    client.close();
+    sftp.end();
   }
 }
