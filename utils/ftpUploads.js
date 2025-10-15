@@ -8,9 +8,9 @@ export async function uploadToHostPinnacle(localFilePath, remoteFileName) {
 
   try {
     await client.access({
-      host: "ftp.yourdomain.com",     // replace with your HostPinnacle FTP host
-      user: "your-ftp-username",      // replace with your FTP username
-      password: "your-ftp-password",  // replace with your FTP password
+      host: process.env.FTP_HOST,     // replace with your HostPinnacle FTP host
+      user: process.env.FTP_USER,      // replace with your FTP username
+      password: process.env.FTP_PASS,  // replace with your FTP password
       secure: true                     // explicit FTPS
     });
 
