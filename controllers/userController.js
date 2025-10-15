@@ -147,15 +147,37 @@ const upload = multer({ storage });
 
 // === Register business function ===
 
+
+
 export const registerBusiness = async (req, res) => {
   try {
-    const { business_name, business_email, id_number, business_license, business_address, business_phone } = req.body;
+    const {
+      business_name,
+      business_email,
+      id_number,
+      business_license,
+      business_address,
+      business_phone,
+    } = req.body;
 
+    // Step 1: Ensure files are present
     if (!req.files?.id_image || !req.files?.address_proof) {
-      return res.status(400).json({ message: "Files are required" });
+      return res.status(400).json({ message: "Files (ID and Address proof) are required." });
     }
 
-    // Upload images to HostPinnacle
+    // Step 2: Find user_id from users table using business_email
+    const [userResult] = await db.query(
+      "SELECT id FROM users WHERE email = ? LIMIT 1",
+      [business_email]
+    );
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ message: "User with that email not found." });
+    }
+
+    const user_id = userResult[0].id;
+
+    // Step 3: Upload both files to HostPinnacle
     const idImageUrl = await uploadToHostPinnacle(
       req.files.id_image[0].path,
       req.files.id_image[0].filename
@@ -166,10 +188,10 @@ export const registerBusiness = async (req, res) => {
       req.files.address_proof[0].filename
     );
 
-    // Insert business info into your database with URLs
+    // Step 4: Insert into businesses table
     const [result] = await db.query(
-      `INSERT INTO businesses
-       (user_id, business_name, business_license, business_address, business_phone, business_email, id_number, id_image, address_proof)
+      `INSERT INTO businesses 
+        (user_id, business_name, business_license, business_address, business_phone, business_email, id_number, id_image, address_proof)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id,
@@ -180,27 +202,28 @@ export const registerBusiness = async (req, res) => {
         business_email,
         id_number,
         idImageUrl,
-        addressProofUrl
+        addressProofUrl,
       ]
     );
 
+    // Step 5: Respond to frontend
     res.status(201).json({
-      message: "Business registered successfully",
+      message: "✅ Business registered successfully",
       business_id: result.insertId,
+      user_id,
       id_image: idImageUrl,
-      address_proof: addressProofUrl
+      address_proof: addressProofUrl,
     });
 
   } catch (error) {
     console.error("❌ registerBusiness error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
 
 export const fetchBusinessDetails = async (req, res) => {
   try {
-    // Fetch all business records
     const [results] = await db.query(`
       SELECT 
         b.id,
@@ -224,9 +247,7 @@ export const fetchBusinessDetails = async (req, res) => {
       return res.status(404).json({ message: "No businesses found." });
     }
 
-    // Build full URLs for uploaded files
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-
+    // Normalize file URLs (don’t double-prefix if already absolute)
     const businesses = results.map((business) => ({
       id: business.id,
       business_name: business.business_name,
@@ -238,15 +259,15 @@ export const fetchBusinessDetails = async (req, res) => {
       status: business.status,
       owner_name: business.owner_name,
       owner_email: business.owner_email,
-      id_image: business.id_image
-        ? `${baseUrl}${business.id_image}`
-        : null,
-      address_proof: business.address_proof
-        ? `${baseUrl}${business.address_proof}`
-        : null,
+      id_image: business.id_image?.startsWith("http")
+        ? business.id_image
+        : `${req.protocol}://${req.get("host")}${business.id_image}`,
+      address_proof: business.address_proof?.startsWith("http")
+        ? business.address_proof
+        : `${req.protocol}://${req.get("host")}${business.address_proof}`,
     }));
 
-    return res.status(200).json(businesses);
+    res.status(200).json(businesses);
   } catch (error) {
     console.error("❌ fetchBusinessDetails error:", error);
     res.status(500).json({
@@ -255,6 +276,7 @@ export const fetchBusinessDetails = async (req, res) => {
     });
   }
 };
+
 
 /** =========================
  *  LOGOUT USER
