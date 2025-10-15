@@ -8,7 +8,7 @@ import  dotenv from  "dotenv";
 dotenv.config();
 import  db from  "../config/db.js"; // This is your pool.promise()
 import ftp from "basic-ftp";
-
+import { uploadToHostPinnacle } from "../utils/ftpUploads.js";
 /** =========================
  *  REGISTER USER
  * ========================= */
@@ -149,57 +149,54 @@ const upload = multer({ storage });
 
 export const registerBusiness = async (req, res) => {
   try {
-    const {
-      business_name,
-      business_license,
-      business_address,
-      business_phone,
-      business_email,
-      id_number,
-    } = req.body;
+    const { business_name, business_email, id_number, business_license, business_address, business_phone } = req.body;
 
-    // 1️⃣ Check uploaded files (from multer)
-    const idImagePath = req.files?.id_image?.[0]?.path;
-    const addressProofPath = req.files?.address_proof?.[0]?.path;
+    if (!req.files?.id_image || !req.files?.address_proof) {
+      return res.status(400).json({ message: "Files are required" });
+    }
 
-    if (!idImagePath || !addressProofPath)
-      return res.status(400).json({ message: "Both images are required." });
+    // Upload images to HostPinnacle
+    const idImageUrl = await uploadToHostPinnacle(
+      req.files.id_image[0].path,
+      req.files.id_image[0].filename
+    );
 
-    // 2️⃣ Connect to FTP
-    const client = new ftp.Client();
-    client.ftp.verbose = false;
+    const addressProofUrl = await uploadToHostPinnacle(
+      req.files.address_proof[0].path,
+      req.files.address_proof[0].filename
+    );
 
-    await client.access({
-      host: process.env.FTP_HOST,       // e.g. ftp.fishmartapp.com
-      user: process.env.FTP_USER,       // your FTP username
-      password: process.env.FTP_PASS,   // your FTP password
-      secure: false,                    // or true if using FTPS
-    });
+    // Insert business info into your database with URLs
+    const [result] = await db.query(
+      `INSERT INTO businesses
+       (user_id, business_name, business_license, business_address, business_phone, business_email, id_number, id_image, address_proof)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user_id,
+        business_name,
+        business_license,
+        business_address,
+        business_phone,
+        business_email,
+        id_number,
+        idImageUrl,
+        addressProofUrl
+      ]
+    );
 
-    // 3️⃣ Upload files to remote folder
-    await client.uploadFrom(idImagePath, `uploads/business/${path.basename(idImagePath)}`);
-    await client.uploadFrom(addressProofPath, `uploads/business/${path.basename(addressProofPath)}`);
-
-    client.close();
-
-    // 4️⃣ Now store only remote URLs in DB
-    const id_image_url = `https://fishmartapp.com/uploads/business/${path.basename(idImagePath)}`;
-    const address_proof_url = `https://fishmartapp.com/uploads/business/${path.basename(addressProofPath)}`;
-
-    // Continue your DB insertion logic...
-    // db.query("INSERT INTO businesses ...", [id_image_url, address_proof_url])
-
-    res.status(201).json({ 
-      message: "Business registered successfully!", 
-      id_image_url, 
-      address_proof_url 
+    res.status(201).json({
+      message: "Business registered successfully",
+      business_id: result.insertId,
+      id_image: idImageUrl,
+      address_proof: addressProofUrl
     });
 
   } catch (error) {
-    console.error("FTP Upload Error:", error);
-    res.status(500).json({ message: "Failed to upload to HostPinnacle" });
+    console.error("❌ registerBusiness error:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 export const fetchBusinessDetails = async (req, res) => {
   try {
