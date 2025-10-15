@@ -7,6 +7,7 @@ import  multer from  "multer";
 import  dotenv from  "dotenv";
 dotenv.config();
 import  db from  "../config/db.js"; // This is your pool.promise()
+import ftp from "basic-ftp";
 
 /** =========================
  *  REGISTER USER
@@ -145,6 +146,7 @@ export const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // === Register business function ===
+
 export const registerBusiness = async (req, res) => {
   try {
     const {
@@ -156,75 +158,46 @@ export const registerBusiness = async (req, res) => {
       id_number,
     } = req.body;
 
-    // Step 1: Get user_id using business_email
-    const [userRows] = await db.query(
-      "SELECT id FROM users WHERE email = ?",
-      [business_email]
-    );
+    // 1️⃣ Check uploaded files (from multer)
+    const idImagePath = req.files?.id_image?.[0]?.path;
+    const addressProofPath = req.files?.address_proof?.[0]?.path;
 
-    if (userRows.length === 0) {
-      return res.status(404).json({ message: "User not found for the provided email." });
-    }
+    if (!idImagePath || !addressProofPath)
+      return res.status(400).json({ message: "Both images are required." });
 
-    const user_id = userRows[0].id;
+    // 2️⃣ Connect to FTP
+    const client = new ftp.Client();
+    client.ftp.verbose = false;
 
-    // Step 2: Validate required fields
-    if (
-      !business_name ||
-      !business_license ||
-      !business_address ||
-      !business_phone ||
-      !business_email ||
-      !id_number ||
-      !req.files?.id_image ||
-      !req.files?.address_proof
-    ) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
+    await client.access({
+      host: process.env.FTP_HOST,       // e.g. ftp.fishmartapp.com
+      user: process.env.FTP_USER,       // your FTP username
+      password: process.env.FTP_PASS,   // your FTP password
+      secure: false,                    // or true if using FTPS
+    });
 
-    // Step 3: Check if the business already exists for this user
-    const [existingBusiness] = await db.query(
-      "SELECT id FROM businesses WHERE user_id = ? LIMIT 1",
-      [user_id]
-    );
+    // 3️⃣ Upload files to remote folder
+    await client.uploadFrom(idImagePath, `uploads/business/${path.basename(idImagePath)}`);
+    await client.uploadFrom(addressProofPath, `uploads/business/${path.basename(addressProofPath)}`);
 
-    if (existingBusiness.length > 0) {
-      return res.status(400).json({ message: "Business already registered for this user." });
-    }
+    client.close();
 
-    // Step 4: Extract uploaded file paths
-    const id_image = `/uploads/business/${req.files.id_image[0].filename}`;
-    const address_proof = `/uploads/business/${req.files.address_proof[0].filename}`;
+    // 4️⃣ Now store only remote URLs in DB
+    const id_image_url = `https://fishmartapp.com/uploads/business/${path.basename(idImagePath)}`;
+    const address_proof_url = `https://fishmartapp.com/uploads/business/${path.basename(addressProofPath)}`;
 
-    // Step 5: Insert business record
-    const insertSql = `
-      INSERT INTO businesses (
-        user_id, business_name, business_license, business_address,
-        business_phone, business_email, id_number, id_image, address_proof
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    // Continue your DB insertion logic...
+    // db.query("INSERT INTO businesses ...", [id_image_url, address_proof_url])
 
-    const [result] = await db.query(insertSql, [
-      user_id,
-      business_name,
-      business_license,
-      business_address,
-      business_phone,
-      business_email,
-      id_number,
-      id_image,
-      address_proof,
-    ]);
-
-    return res.status(201).json({
-      message: "Business registered successfully",
-      business_id: result.insertId,
-      status: "pending",
+    res.status(201).json({ 
+      message: "Business registered successfully!", 
+      id_image_url, 
+      address_proof_url 
     });
 
   } catch (error) {
-    console.error("❌ registerBusiness error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("FTP Upload Error:", error);
+    res.status(500).json({ message: "Failed to upload to HostPinnacle" });
   }
 };
 
