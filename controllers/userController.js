@@ -306,17 +306,22 @@ export const fetchSingleBusiness = async (req, res) => {
     const user_id = req.user?.id;
     const role = req.user?.role;
 
-    if (!user_id || role !== "seller") {
-      return res.status(403).json({ message: "Not authorized" });
+    // 🔒 Check authentication and role
+    if (!user_id) {
+      return res.status(401).json({ message: "Unauthorized: Missing user ID" });
     }
 
-    // ✅ Fixed: removed extra comma in SQL query
+    if (role !== "seller" && role !== "admin") {
+      return res.status(403).json({ message: "Forbidden: Access denied" });
+    }
+
+    // 🧠 Fetch the business data
     const [rows] = await db.query(
       "SELECT business_name, business_phone, status FROM businesses WHERE user_id = ? LIMIT 1",
       [user_id]
     );
 
-    if (rows.length === 0) {
+    if (!rows || rows.length === 0) {
       return res.status(404).json({ message: "No business found for this user" });
     }
 
@@ -326,9 +331,17 @@ export const fetchSingleBusiness = async (req, res) => {
       status: rows[0].status,
     };
 
-    return res.status(200).json(business);
+    // ✅ Success
+    return res.status(200).json({
+      success: true,
+      business,
+    });
   } catch (error) {
-    console.error("Business fetch error:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    console.error("❌ Business fetch error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching business",
+      error: error.message,
+    });
   }
 };
