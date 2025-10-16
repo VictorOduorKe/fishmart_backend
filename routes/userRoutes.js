@@ -6,7 +6,8 @@ import {
   loginUser, 
   registerBusiness, 
   logOutUser, 
-  fetchBusinessDetails
+  fetchBusinessDetails,
+  fetchSingleBusiness
 } from "../controllers/userController.js";
 import { protect, getProfile } from "../midleware/authMidleware.js";
 
@@ -30,6 +31,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.get("/profile", protect, getProfile);
 router.get("/businesses", fetchBusinessDetails);
+router.get("/business",protect, fetchSingleBusiness);
 // 👇 Add upload middleware here
 router.post(
   "/register-business",

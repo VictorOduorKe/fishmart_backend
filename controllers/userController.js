@@ -9,6 +9,7 @@ dotenv.config();
 import  db from  "../config/db.js"; // This is your pool.promise()
 import ftp from "basic-ftp";
 import { uploadToHostPinnacle } from "../utils/ftpUploads.js";
+import { json } from "stream/consumers";
 /** =========================
  *  REGISTER USER
  * ========================= */
@@ -299,3 +300,35 @@ export const logOutUser = async (req, res) => {
   }
 };
 
+
+export const fetchSingleBusiness = async (req, res) => {
+  try {
+    const user_id = req.user?.id;
+    const role = req.user?.role;
+
+    if (!user_id || role !== "seller") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // ✅ Fixed: removed extra comma in SQL query
+    const [rows] = await db.query(
+      "SELECT business_name, business_phone, status FROM businesses WHERE user_id = ? LIMIT 1",
+      [user_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "No business found for this user" });
+    }
+
+    const business = {
+      name: rows[0].business_name,
+      phone: rows[0].business_phone,
+      status: rows[0].status,
+    };
+
+    return res.status(200).json(business);
+  } catch (error) {
+    console.error("Business fetch error:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
