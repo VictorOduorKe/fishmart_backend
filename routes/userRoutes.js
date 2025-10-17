@@ -7,10 +7,10 @@ import {
   registerBusiness, 
   logOutUser, 
   fetchBusinessDetails,
-  fetchSingleBusiness
+  fetchSingleBusiness,
+  logOutUser
 } from "../controllers/userController.js";
 import { protect, getProfile } from "../midleware/authMidleware.js";
-import { logoutUser } from "../../frontend/js/user/login.js";
 
 const router = express.Router();
 
