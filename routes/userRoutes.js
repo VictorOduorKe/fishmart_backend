@@ -32,7 +32,7 @@ router.post("/login", loginUser);
 router.get("/profile", protect, getProfile);
 router.get("/businesses", fetchBusinessDetails);
 router.get("/business",protect, fetchSingleBusiness);
-router.get('/logout',protect,logoutUser)
+router.get('/logout',protect,logOutUser)
 // 👇 Add upload middleware here
 router.post(
   "/register-business",
