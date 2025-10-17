@@ -10,6 +10,7 @@ import {
   fetchSingleBusiness
 } from "../controllers/userController.js";
 import { protect, getProfile } from "../midleware/authMidleware.js";
+import { logoutUser } from "../../frontend/js/user/login.js";
 
 const router = express.Router();
 
@@ -32,6 +33,7 @@ router.post("/login", loginUser);
 router.get("/profile", protect, getProfile);
 router.get("/businesses", fetchBusinessDetails);
 router.get("/business",protect, fetchSingleBusiness);
+router.get('/logout',protect,logoutUser)
 // 👇 Add upload middleware here
 router.post(
   "/register-business",
