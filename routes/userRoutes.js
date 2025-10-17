@@ -7,8 +7,7 @@ import {
   registerBusiness, 
   logOutUser, 
   fetchBusinessDetails,
-  fetchSingleBusiness,
-  logOutUser
+  fetchSingleBusiness
 } from "../controllers/userController.js";
 import { protect, getProfile } from "../midleware/authMidleware.js";
 
