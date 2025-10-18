@@ -41,33 +41,34 @@ app.use(
   })
 );
 
-// ✅ Handle preflight OPTIONS requests (important for file uploads)
-app.options("*", cors());
+//  Handle preflight OPTIONS requests (important for file uploads)
+app.options(/.*/, cors());
 
-// ✅ Parse JSON requests
+
+// Parse JSON requests
 app.use(express.json());
 
-// ✅ Create uploads folder if missing
+//  Create uploads folder if missing
 const uploadDir = path.join(__dirname, "uploads/business");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
-  console.log("✅ Created upload directory:", uploadDir);
+  console.log(" Created upload directory:", uploadDir);
 }
 
-// ✅ Serve uploads folder as static files
+// Serve uploads folder as static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ✅ Mount routes
+// Mount routes
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 
-// ✅ Root route
+// Root route
 app.get("/", (req, res) => {
   res.send("Backend API is running...");
 });
 
-// ✅ Multer error handler
+//  Multer error handler
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
@@ -79,7 +80,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// ✅ Start server
+//  Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(` Server running on port ${PORT}`));
 
