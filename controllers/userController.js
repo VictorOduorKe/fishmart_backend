@@ -163,7 +163,9 @@ export const registerBusiness = async (req, res) => {
 
     // Step 1: Ensure files are present
     if (!req.files?.id_image || !req.files?.address_proof) {
-      return res.status(400).json({ message: "Files (ID and Address proof) are required." });
+      return res
+        .status(400)
+        .json({ message: "Files (ID and Address proof) are required." });
     }
 
     // Step 2: Find user_id from users table using business_email
@@ -173,7 +175,9 @@ export const registerBusiness = async (req, res) => {
     );
 
     if (userResult.length === 0) {
-      return res.status(404).json({ message: "User with that email not found." });
+      return res
+        .status(404)
+        .json({ message: "User with that email not found." });
     }
 
     const user_id = userResult[0].id;
@@ -207,7 +211,12 @@ export const registerBusiness = async (req, res) => {
       ]
     );
 
-    // Step 5: Respond to frontend
+    // ✅ Step 5: Update user role to 'seller'
+    await db.query("UPDATE users SET user_role = 'seller' WHERE id = ?", [
+      user_id,
+    ]);
+
+    // Step 6: Respond to frontend
     res.status(201).json({
       message: "✅ Business registered successfully",
       business_id: result.insertId,
@@ -215,12 +224,14 @@ export const registerBusiness = async (req, res) => {
       id_image: idImageUrl,
       address_proof: addressProofUrl,
     });
-
   } catch (error) {
     console.error("❌ registerBusiness error:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 
 export const fetchBusinessDetails = async (req, res) => {
