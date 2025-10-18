@@ -1,9 +1,9 @@
-import  jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+import db from "../config/db.js"; // adjust import
 
- export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader?.startsWith("Bearer ")) {
     return res.status(401).json({ message: "No token provided" });
   }
 
@@ -11,8 +11,15 @@ import  jwt from "jsonwebtoken";
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 🔍 Check if refresh token still exists for this user (optional but strong)
+    const [rows] = await db.query("SELECT token FROM jwt_tokens WHERE user_id = ?", [decoded.id]);
+    if (!rows[0] || !rows[0].token) {
+      return res.status(401).json({ message: "Session expired. Please log in again." });
+    }
+
     req.user = decoded;
-    next(); // proceed to protected route
+    next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
       return res.status(401).json({ message: "Token has expired" });
@@ -20,6 +27,7 @@ import  jwt from "jsonwebtoken";
     return res.status(401).json({ message: "Invalid token" });
   }
 };
+
 
 export const getProfile = (req, res) => {
   // protect runs before this
