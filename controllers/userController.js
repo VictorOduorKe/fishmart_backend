@@ -81,6 +81,11 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
+  // ✅ Ensure both email and password are provided
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required." });
+  }
+
   try {
     const [rows] = await db.query(
       "SELECT id, full_name, email, password, user_role FROM users WHERE email = ? LIMIT 1",
@@ -91,6 +96,7 @@ export const loginUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
 
     const user = rows[0];
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(401).json({ message: "Invalid credentials" });
@@ -109,7 +115,10 @@ export const loginUser = async (req, res) => {
     );
 
     // 💾 Store refresh token
-    await db.query("UPDATE jwt_tokens SET token = ? WHERE user_id = ?", [refreshToken, user.id]);
+    await db.query(
+      "UPDATE jwt_tokens SET token = ? WHERE user_id = ?",
+      [refreshToken, user.id]
+    );
 
     return res.json({
       message: "Login successful",
@@ -127,6 +136,7 @@ export const loginUser = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 /** =========================
  *  REGISTER BUSINESS
