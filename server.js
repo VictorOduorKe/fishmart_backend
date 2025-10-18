@@ -7,6 +7,7 @@ import productRoutes from "./routes/productRoute.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import fs from "fs";
 import path from "path";
+import multer from "multer"; // ✅ You’re using multer in your error handler
 import { fileURLToPath } from "url";
 
 dotenv.config();
@@ -20,8 +21,30 @@ const __dirname = path.dirname(__filename);
 // ✅ Connect database
 db;
 
-// Middleware
-app.use(cors());
+// ✅ Proper CORS setup
+const allowedOrigins = [
+  "http://localhost:3000",               // local dev
+  "http://127.0.0.1:5500"               // local testing via VSCode Live Server
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+
+// ✅ Handle preflight OPTIONS requests (important for file uploads)
+app.options("*", cors());
+
+// ✅ Parse JSON requests
 app.use(express.json());
 
 // ✅ Create uploads folder if missing
@@ -34,16 +57,17 @@ if (!fs.existsSync(uploadDir)) {
 // ✅ Serve uploads folder as static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Routes
+// ✅ Mount routes
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 
-// Root route
+// ✅ Root route
 app.get("/", (req, res) => {
   res.send("Backend API is running...");
 });
-// after your routes
+
+// ✅ Multer error handler
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
@@ -52,10 +76,10 @@ app.use((err, req, res, next) => {
   } else if (err.message.includes("Invalid file type")) {
     return res.status(400).json({ message: err.message });
   }
-
   next(err);
 });
 
-// Start server
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
