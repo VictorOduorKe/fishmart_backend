@@ -43,6 +43,18 @@ app.use("/api/orders", orderRoutes);
 app.get("/", (req, res) => {
   res.send("Backend API is running...");
 });
+// after your routes
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "File too large. Max size is 2MB." });
+    }
+  } else if (err.message.includes("Invalid file type")) {
+    return res.status(400).json({ message: err.message });
+  }
+
+  next(err);
+});
 
 // Start server
 const PORT = process.env.PORT || 5000;

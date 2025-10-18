@@ -144,7 +144,28 @@ export const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+// ✅ Allowed image types
+const allowedTypes = /jpeg|jpg|png/;
+
+// ✅ File type validation
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mime = file.mimetype.toLowerCase();
+
+  if (!allowedTypes.test(ext) || !allowedTypes.test(mime)) {
+    return cb(new Error("Only .jpg, .jpeg, or .png files are allowed!"));
+  }
+
+  cb(null, true);
+};
+
+// ✅ Limit file size to 2MB (2 * 1024 * 1024 bytes)
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 2 * 1024 * 1024 },
+});
+
 
 // === Register business function ===
 

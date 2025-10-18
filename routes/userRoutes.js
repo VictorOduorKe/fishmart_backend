@@ -10,6 +10,7 @@ import {
   fetchSingleBusiness
 } from "../controllers/userController.js";
 import { protect, getProfile } from "../midleware/authMidleware.js";
+import { upload } from "../midleware/multerConfig.js"; // assuming you save it separately
 
 const router = express.Router();
 
@@ -24,7 +25,6 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
 
 // === Routes ===
 router.post("/register", registerUser);
@@ -33,7 +33,9 @@ router.get("/profile", protect, getProfile);
 router.get("/businesses", fetchBusinessDetails);
 router.get("/business",protect, fetchSingleBusiness);
 router.get('/logout',protect,logOutUser)
+
 // 👇 Add upload middleware here
+
 router.post(
   "/register-business",
   upload.fields([
@@ -42,6 +44,7 @@ router.post(
   ]),
   registerBusiness
 );
+
 
 router.post("/logout", protect, logOutUser);
 
