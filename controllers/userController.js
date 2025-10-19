@@ -215,7 +215,7 @@ export const registerBusiness = async (req, res) => {
 
     //----- Check if user with that email already has a business account ----//
 const [businessResult] = await db.query(
-  "SELECT id FROM business WHERE business_email = ? LIMIT 1",
+  "SELECT id FROM businesses WHERE business_email = ? LIMIT 1",
   [business_email]
 );
 
