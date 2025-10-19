@@ -213,6 +213,18 @@ export const registerBusiness = async (req, res) => {
 
     const user_id = userResult[0].id;
 
+    //----- Check if user with that email already has a business account ----//
+const [businessResult] = await db.query(
+  "SELECT id FROM business WHERE business_email = ? LIMIT 1",
+  [business_email]
+);
+
+if (businessResult.length > 0) {
+  return res.status(409).json({
+    message: "A business with that email already exists.",
+  });
+}
+
     // Step 3: Upload both files to HostPinnacle
     const idImageUrl = await uploadToHostPinnacle(
       req.files.id_image[0].path,
